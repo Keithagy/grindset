@@ -6,6 +6,7 @@
   - [Dependencies](#dependencies)
   - [(Un)Install](#uninstall)
   - [Usage](#usage)
+  - [Notes](#notes)
   <!--toc:end-->
 
 Simple, minimal helper with Leetcode practice
@@ -40,3 +41,11 @@ which grindset
 ```terminal
 grindset two-sum py
 ```
+
+## Notes
+
+- `grindset` starter boilerplate for your language if available from Leetcode's API, but Leetcode's API does not necessarily provide fully valid boilerplate. Some examples:
+  - Go boilerplate snippets would not include the requisite `package main` declaration.
+  - Python boilerplate might include type hints in function signatures that you would then need to import.
+- Be careful that you're running the command in the **root of your project**, as files get created at the current working directory.
+  - This might improve in a subsequent version, with the addition of a project root marker file (e.g. `grindset.toml`).

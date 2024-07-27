@@ -2,6 +2,7 @@ use chrono::Local;
 use clap::Parser;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
@@ -64,6 +65,26 @@ struct QuestionAttributes {
     topics: Vec<String>,
 }
 
+#[derive(Deserialize)]
+struct QuestionBoilerplateData {
+    question: QuestionBoilerplate,
+}
+
+#[derive(Deserialize)]
+struct QuestionBoilerplate {
+    #[serde(rename = "codeSnippets")]
+    code_snippets: Vec<CodeSnippet>,
+}
+
+#[derive(Deserialize)]
+struct CodeSnippet {
+    lang: String,
+    #[serde(rename = "langSlug")]
+    lang_slug: String,
+    /// code is returned from Leetcode API as string representation
+    code: String,
+}
+
 #[derive(Serialize)]
 struct AttemptAttributes {
     success: bool,
@@ -88,36 +109,82 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let (Some(title_slug), Some(language_file_ext)) = (cli.title_slug, cli.language_file_ext) {
         log_practice(title_slug, validate_lang_file_ext(language_file_ext)?).await?;
     } else {
-        println!("Usage: `grindset <problem_title_slug e.g. two-sum> <language file extention WITHOUT dot; e.g. `py`, `js`, `cpp`, `rs`>`");
+        eprintln!("Usage: `grindset <problem_title_slug e.g. two-sum> <language file extention WITHOUT dot; e.g. `py`, `js`, `cpp`, `rs`>`");
     }
     Ok(())
 }
 
+#[derive(Debug)]
+enum LeetcodeSupportedLang {
+    Go,
+    Java,
+    /// NOTE: we are pretending only python3 exists
+    Python3,
+    JavaScript,
+    TypeScript,
+    Cpp,
+    C,
+    Swift,
+    Kotlin,
+    Dart,
+    Ruby,
+    Scala,
+    Rust,
+    Racket,
+    Erlang,
+    Elixir,
+}
+impl TryFrom<&str> for LeetcodeSupportedLang {
+    type Error = Box<dyn std::error::Error>;
+    /// Expects file extensions (without the dot) of supported programming languages
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "cpp" => Ok(Self::Cpp),
+            "java" => Ok(Self::Java),
+            "py" => Ok(Self::Python3),
+            "c" => Ok(Self::C),
+            "js" => Ok(Self::JavaScript),
+            "ts" => Ok(Self::TypeScript),
+            "swift" => Ok(Self::Swift),
+            "kt" => Ok(Self::Kotlin),
+            "dart" => Ok(Self::Dart),
+            "go" => Ok(Self::Go),
+            "rb" => Ok(Self::Ruby),
+            "scala" => Ok(Self::Scala),
+            "rs" => Ok(Self::Rust),
+            "rkt" => Ok(Self::Racket),
+            "erl" => Ok(Self::Erlang),
+            "ex" | "exs" => Ok(Self::Elixir),
+            unsupp_ext => Err(format!("Unsupported file extension: {}", unsupp_ext).into()),
+        }
+    }
+}
+
+impl LeetcodeSupportedLang {
+    fn leetcode_slug(&self) -> &str {
+        match self {
+            LeetcodeSupportedLang::Go => "golang",
+            LeetcodeSupportedLang::Java => "java",
+            LeetcodeSupportedLang::Python3 => "python3",
+            LeetcodeSupportedLang::JavaScript => "javascript",
+            LeetcodeSupportedLang::TypeScript => "typescript",
+            LeetcodeSupportedLang::Cpp => "cpp",
+            LeetcodeSupportedLang::C => "c",
+            LeetcodeSupportedLang::Swift => "swift",
+            LeetcodeSupportedLang::Kotlin => "kotlin",
+            LeetcodeSupportedLang::Dart => "dart",
+            LeetcodeSupportedLang::Ruby => "ruby",
+            LeetcodeSupportedLang::Scala => "scala",
+            LeetcodeSupportedLang::Rust => "rust",
+            LeetcodeSupportedLang::Racket => "racket",
+            LeetcodeSupportedLang::Erlang => "erlang",
+            LeetcodeSupportedLang::Elixir => "elixir",
+        }
+    }
+}
+
 /// Validates and normalizes a language file extension by removing the leading dot if present.
 /// Returns an error if the resulting language code is empty.
-/// # Arguments
-/// * `parsed` - A string that holds the language file extension.
-/// # Returns
-/// * `Ok(String)` with the normalized file extension (without leading dot) if valid.
-/// * `Err(Box<dyn std::error::Error>)` if the resulting language code is empty.
-/// # Examples
-/// ```
-/// # use std::error::Error;
-/// # fn main() -> Result<(), Box<dyn Error>> {
-/// assert_eq!(validate_lang_file_ext("js".to_string())?, "js");
-/// assert_eq!(validate_lang_file_ext("py".to_string())?, "py");
-/// assert_eq!(validate_lang_file_ext(".js".to_string())?, "js");
-/// assert_eq!(validate_lang_file_ext(".ts".to_string())?, "ts");
-/// assert_eq!(validate_lang_file_ext("   ..ts".to_string())?, "ts");
-/// assert_eq!(validate_lang_file_ext(".cpp".to_string())?, "cpp");
-/// assert_eq!(validate_lang_file_ext("...cpp".to_string())?, "cpp");
-/// assert_eq!(validate_lang_file_ext("...  cpp...".to_string())?, "cpp");
-/// assert!(validate_lang_file_ext(".".to_string()).is_err());
-/// assert!(validate_lang_file_ext("...".to_string()).is_err());
-/// assert!(validate_lang_file_ext("".to_string()).is_err());
-/// # Ok(())
-/// # }
-/// ```
 fn validate_lang_file_ext(parsed: String) -> Result<String, Box<dyn std::error::Error>> {
     let lang_code: String = parsed.trim_matches(|c| c == ' ' || c == '.').into();
     match &lang_code.is_empty() {
@@ -133,7 +200,7 @@ fn check_pandoc() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Pandoc is not installed or not in PATH".into());
     }
 
-    println!(
+    eprintln!(
         "Pandoc version: {}",
         String::from_utf8_lossy(&output.stdout)
             .lines()
@@ -187,7 +254,20 @@ async fn log_practice(
     fs::create_dir_all(&attempt_folder)?;
 
     let attempt_file_path = attempt_folder.join(format!("attempt.{}", language_file_ext));
-    File::create(attempt_file_path)?;
+    let mut attempt_file = File::create(attempt_file_path)?;
+    let question_boilerplate = fetch_question_boilerplate(&title_slug).await?;
+    let language = LeetcodeSupportedLang::try_from(language_file_ext.borrow())?;
+    let boilerplate_for_lang = question_boilerplate
+        .question
+        .code_snippets
+        .into_iter()
+        .find(|snippet| snippet.lang_slug == language.leetcode_slug())
+        .map(|found| found.code);
+    if let Some(code) = boilerplate_for_lang {
+        attempt_file.write_all(code.as_bytes())?;
+    } else {
+        eprintln!("No boilerplate for language: {:#?}", language);
+    };
 
     let toml_datetime = toml_edit::Datetime::from_str(&attempt_datetime.to_rfc3339())?;
     let attempt_attributes = AttemptAttributes {
@@ -230,7 +310,8 @@ async fn log_practice(
     let mut attempt_attributes_file = File::create(attempt_attributes_path)?;
     attempt_attributes_file.write_all(attempt_attributes_toml_document.to_string().as_bytes())?;
 
-    println!("Problem files created successfully.");
+    eprintln!("All done. Grindset time! ");
+    println!("{:#?}", attempt_folder);
     Ok(())
 }
 
@@ -288,6 +369,28 @@ async fn fetch_question_topics(
             question(titleSlug: $titleSlug) {
                 topicTags {
                 name
+                }
+            }
+        }
+    "#,
+        serde_json::json!({
+            "titleSlug": title_slug
+        }),
+    )
+    .await
+}
+
+async fn fetch_question_boilerplate(
+    title_slug: &str,
+) -> Result<QuestionBoilerplateData, Box<dyn std::error::Error>> {
+    execute_graphql_query(
+        r#"
+        query questionEditorData($titleSlug: String!) {
+            question(titleSlug: $titleSlug) {
+                codeSnippets {
+                lang
+                langSlug
+                code
                 }
             }
         }

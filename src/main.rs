@@ -311,7 +311,7 @@ async fn log_practice(
     attempt_attributes_file.write_all(attempt_attributes_toml_document.to_string().as_bytes())?;
 
     eprintln!("All done. Grindset time! ");
-    println!("{:#?}", attempt_folder);
+    println!("{}", attempt_folder.display());
     Ok(())
 }
 

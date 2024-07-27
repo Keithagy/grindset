@@ -5,8 +5,8 @@
 ### Ergonomic Setup
 
 - [x] `grindset` should copy in starter boilerplate
+- [x] `grindset` should output the filepath of the created attempt log, so you can do a pipe
 - [ ] `question.md` should include id and title of question as a header (which is also a link to the question on leetcode)
-- [ ] `grindset` should output the filepath of the created attempt log, so you can do a pipe
 - [ ] `init` subcommand to mark a directory as project root (e.g. with a `grindset.toml` file)
   - [ ] subsequently, `grindset` should be able to search for project root and always create new files there, instead of at cwd
   - [ ] `init <<language>>` subcommand to set up language-specific boilerplate (e.g go mod init, poetry, cargo)

@@ -6,6 +6,8 @@
   - [Dependencies](#dependencies)
   - [(Un)Install](#uninstall)
   - [Usage](#usage)
+    - [Recommended](#recommended)
+    - [Basic](#basic)
   - [Notes](#notes)
   <!--toc:end-->
 
@@ -37,6 +39,24 @@ which grindset
 ```
 
 ## Usage
+
+**Make sure you're in the correct directory, we currently don't have project root tracking!**
+
+`grindset` relies on leetcode question slugs, which you can reliably get from your browser's address bar:
+![Where to find question slug from Leetcode url](./assets/question_slug.png)
+
+### Recommended
+
+`grindset` returns the path of the created attempt directory for piping and chaining.
+So, if you use an in-terminal editor like [Neovim](https://neovim.io/) , you can jump into your editor with a single command.
+
+```terminal
+cd $(grindset two-sum py) && nvim $(find attempt.*)
+```
+
+Set up a [shell alias](https://www.ibm.com/docs/en/aix/7.3?topic=commands-creating-command-alias-alias-shell-command) for it, if you'd like!
+
+### Basic
 
 ```terminal
 grindset two-sum py
